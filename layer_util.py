@@ -30,16 +30,6 @@ def layer_norm(inputs, scope='ln'):
         outputs = gamma * normalized + beta
     return outputs
 
-#x = tf.constant([[[1,2,3],[4,5,6]],[[7,8,9],[10,11,12]]], dtype=tf.float32)
-#sess = tf.Session()
-#nx = layer_norm(x, 'test/ln')
-#sess.run(tf.global_variables_initializer())
-#print x.shape
-#print sess.run(x)
-#print nx.shape
-#print sess.run(nx)
-#sys.exit(0)
-
 def get_embeddings(dict_size, num_units, scope, zero_pad=True, partitioner=None):
     '''Constructs token embedding matrix.
     Note that the column of index 0's are set to zeros.
@@ -63,13 +53,6 @@ def get_embeddings(dict_size, num_units, scope, zero_pad=True, partitioner=None)
             embeddings = tf.concat((tf.zeros(shape=[1, num_units]),
                                     embeddings[1:, :]), 0)
     return embeddings
-
-#embed = get_embeddings(16, 4, 'embedding')
-#sess = tf.Session()
-#sess.run(tf.global_variables_initializer())
-#print embed.shape
-#print sess.run(embed)
-#sys.exit(0)
 
 def mask(inputs, queries=None, keys=None, type=None):
     """Masks paddings on keys or queries to inputs
@@ -99,7 +82,6 @@ def mask(inputs, queries=None, keys=None, type=None):
         [0., 0.]]], dtype=float32)
     """
     padding_num = -2 ** 32 + 1
-    #### 将keys对应的padding部分的权重设置成很大的一个负数（等价于不存在对应位置的attention）
     if type in ("k", "key", "keys"):
         # Generate masks
         masks = tf.sign(tf.reduce_sum(tf.abs(keys), axis=-1))  # (N, T_k)
@@ -129,31 +111,6 @@ def mask(inputs, queries=None, keys=None, type=None):
         print("Check if you entered type correctly!")
 
     return outputs
-
-#sess = tf.Session()
-#queries = tf.constant([[[0,0],[1,1],[2,2]]], tf.float32)  #(1,3,2)
-#print 'Q.shape:', queries.shape
-#print sess.run(queries)
-#keys = tf.constant([[[4,4],[0,0],[5,5]]], tf.float32)  #(1,3,2)
-#print 'K.shape:', keys.shape
-#print sess.run(keys)
-##inputs = tf.constant([[[8,0],[16,0],[0,0]]], tf.float32)  #(1,3,2)
-#inputs = tf.matmul(queries, tf.transpose(keys, [0, 2, 1]))
-#print 'inputs.shape:', inputs.shape
-#print sess.run(inputs)
-#outputs = mask(inputs, queries, keys, 'keys')
-#sess.run(tf.global_variables_initializer())
-#print 'outputs.shape:', outputs.shape
-#print sess.run(outputs)
-#print '------------'
-#outputs = mask(inputs, queries, keys, 'queries')
-#print outputs.shape
-#print sess.run(outputs)
-#print '------------'
-#outputs = mask(inputs, queries, keys, 'future')
-#print outputs.shape
-#print sess.run(outputs)
-#sys.exit(0)
 
 def scaled_dot_product_attention(Q, K, V,
                                  causality=False, dropout_rate=0.,
@@ -191,16 +148,6 @@ def scaled_dot_product_attention(Q, K, V,
         outputs = tf.matmul(outputs, V)  # (N, T_q, d_v)
     return outputs
 
-#sess = tf.Session()
-#x = tf.constant([[[0,0],[1,1],[2,2]]], tf.float32)  #(1,3,2)
-#print x.shape
-#print sess.run(x)
-#print '---------'
-#att = scaled_dot_product_attention(x, x, x, training=False)
-#print att.shape
-#print sess.run(att)
-#sys.exit(0)
-
 def multihead_attention(queries, keys, values,
                         num_heads=4, dropout_rate=0.,
                         training=True,
@@ -237,15 +184,6 @@ def multihead_attention(queries, keys, values,
         ## Normalize
         #outputs = layer_norm(outputs)
     return outputs
-
-#sess = tf.Session()
-#x = tf.random_uniform((1, 10, 32)) 
-#print x.shape
-#print sess.run(x)
-#mha = multihead_attention(x, x, x, training=False)
-#sess.run(tf.global_variables_initializer())
-#print mha.shape
-#print sess.run(mha)
 
 def feed_forward(inputs, num_units, activation, scope="positionwise_feedforward"):
     '''position-wise feed forward net. See 3.3
