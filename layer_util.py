@@ -7,7 +7,7 @@ modric10zhang@gmail.com
 
 '''
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 
 def layer_norm(inputs, scope='ln'):
     '''Applies layer normalization. See https://arxiv.org/abs/1607.06450.
@@ -19,13 +19,13 @@ def layer_norm(inputs, scope='ln'):
       A tensor with the same shape and data dtype as `inputs`.
     '''
     epsilon = 1e-8
-    with tf.compat.v1.variable_scope(scope):
+    with tf.variable_scope(scope):
         inputs_shape = inputs.get_shape()
         params_shape = inputs_shape[-1:]
         #[-1] means last dimension 
         mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
-        beta = tf.compat.v1.get_variable("beta", params_shape, initializer=tf.zeros_initializer())
-        gamma = tf.compat.v1.get_variable("gamma", params_shape, initializer=tf.ones_initializer())
+        beta = tf.get_variable("beta", params_shape, initializer=tf.zeros_initializer())
+        gamma = tf.get_variable("gamma", params_shape, initializer=tf.ones_initializer())
         normalized = (inputs - mean) / ( (variance + epsilon) ** (.5) )
         outputs = gamma * normalized + beta
     return outputs
@@ -41,9 +41,9 @@ def get_embeddings(dict_size, num_units, scope, zero_pad=True, partitioner=None)
     Returns
     weight variable: (V, E)
     '''
-    with tf.compat.v1.variable_scope(scope):
-        w_init = tf.compat.v1.truncated_normal_initializer(mean=0, stddev=0.1)
-        embeddings = tf.compat.v1.get_variable('w',
+    with tf.variable_scope(scope):
+        w_init = tf.truncated_normal_initializer(mean=0, stddev=0.1)
+        embeddings = tf.get_variable('w',
                                    dtype=tf.float32,
                                    shape=(dict_size, num_units),
                                    initializer=w_init,
@@ -125,7 +125,7 @@ def scaled_dot_product_attention(Q, K, V,
     training: boolean for controlling droput
     scope: Optional scope for `variable_scope`.
     '''
-    with tf.compat.v1.variable_scope(scope, reuse=tf.compat.v1.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         d_k = Q.get_shape().as_list()[-1]
         # dot product
         outputs = tf.matmul(Q, tf.transpose(K, [0, 2, 1]))  # (N, T_q, T_k)
@@ -143,7 +143,7 @@ def scaled_dot_product_attention(Q, K, V,
         # query masking
         outputs = mask(outputs, Q, K, type="query")
         # dropout
-        outputs = tf.compat.v1.layers.dropout(outputs, rate=dropout_rate, training=training)
+        outputs = tf.layers.dropout(outputs, rate=dropout_rate, training=training)
         # weighted sum (context vectors)
         outputs = tf.matmul(outputs, V)  # (N, T_q, d_v)
     return outputs
@@ -166,11 +166,11 @@ def multihead_attention(queries, keys, values,
       A 3d tensor with shape of (N, T_q, C)  
     '''
     d_model = queries.get_shape().as_list()[-1]
-    with tf.compat.v1.variable_scope(scope, reuse=tf.compat.v1.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         # Linear projections
-        Q = tf.compat.v1.layers.dense(queries, d_model, use_bias=False) # (N, T_q, d_model)
-        K = tf.compat.v1.layers.dense(keys, d_model, use_bias=False) # (N, T_k, d_model)
-        V = tf.compat.v1.layers.dense(values, d_model, use_bias=False) # (N, T_k, d_model)
+        Q = tf.layers.dense(queries, d_model, use_bias=False) # (N, T_q, d_model)
+        K = tf.layers.dense(keys, d_model, use_bias=False) # (N, T_k, d_model)
+        V = tf.layers.dense(values, d_model, use_bias=False) # (N, T_k, d_model)
         # Split and concat
         Q_ = tf.concat(tf.split(Q, num_heads, axis=2), axis=0) # (h*N, T_q, d_model/h)
         K_ = tf.concat(tf.split(K, num_heads, axis=2), axis=0) # (h*N, T_k, d_model/h)
@@ -195,11 +195,11 @@ def feed_forward(inputs, num_units, activation, scope="positionwise_feedforward"
     Returns:
       A 3d tensor with the same shape and dtype as inputs
     '''
-    with tf.compat.v1.variable_scope(scope, reuse=tf.compat.v1.AUTO_REUSE):
+    with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         # Inner layer
-        outputs = tf.compat.v1.layers.dense(inputs, num_units[0], activation=activation)
+        outputs = tf.layers.dense(inputs, num_units[0], activation=activation)
         # Outer layer
-        outputs = tf.compat.v1.layers.dense(outputs, num_units[1])
+        outputs = tf.layers.dense(outputs, num_units[1])
         # Residual connection
         outputs += inputs
         # Normalize

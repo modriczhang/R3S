@@ -7,17 +7,15 @@ modric10zhang@gmail.com
 '''
 
 import os
-import sys
 import math
-import datetime
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 from layer_util import *
 from data_reader import DataReader
 from hyper_param import param_dict as pd
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.compat.v1.disable_eager_execution()
+tf.disable_eager_execution()
 
 ###### global variable for local computation ######
 g_loss_sum = 0.
@@ -31,26 +29,26 @@ g_dr = DataReader(pd['batch_size'])
 class ItemRecommender(object):
     def __init__(self):
         #placeholder
-        self.sph_user = tf.compat.v1.sparse_placeholder(tf.int32, name='sph_user')
-        self.sph_doc = tf.compat.v1.sparse_placeholder(tf.int32, name='sph_doc')
-        self.sph_con = tf.compat.v1.sparse_placeholder(tf.int32, name='sph_con')
-        self.sph_seed = tf.compat.v1.sparse_placeholder(tf.int32, name='sph_seed')
-        self.sph_ig = tf.compat.v1.sparse_placeholder(tf.int32, name='sph_ig')
-        self.ph_dwell_time = tf.compat.v1.placeholder(tf.float32, name='ph_dwell_time')
+        self.sph_user = tf.sparse_placeholder(tf.int32, name='sph_user')
+        self.sph_doc = tf.sparse_placeholder(tf.int32, name='sph_doc')
+        self.sph_con = tf.sparse_placeholder(tf.int32, name='sph_con')
+        self.sph_seed = tf.sparse_placeholder(tf.int32, name='sph_seed')
+        self.sph_ig = tf.sparse_placeholder(tf.int32, name='sph_ig')
+        self.ph_dwell_time = tf.placeholder(tf.float32, name='ph_dwell_time')
         
         self.create_graph('m3oe')
         diff = tf.reshape(self.ph_dwell_time, [-1]) - tf.reshape(self.output, [-1])
         self.loss = tf.reduce_mean(tf.square(diff))
-        vs = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.GLOBAL_VARIABLES, scope='m3oe')
+        vs = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='m3oe')
         self.grads = tf.clip_by_global_norm(tf.gradients(self.loss, vs), pd['grad_clip'])[0]
-        with tf.compat.v1.variable_scope('opt'):
-            optimizer = tf.compat.v1.train.AdamOptimizer(pd['lr'])
+        with tf.variable_scope('opt'):
+            optimizer = tf.train.AdamOptimizer(pd['lr'])
             self.opt = optimizer.apply_gradients(zip(self.grads, vs))
     
     def field_interact(self, fields):
         global g_training
-        qkv = tf.compat.v1.layers.dropout(fields, rate=pd['dropout'], training=g_training)
-        with tf.compat.v1.variable_scope('fi'):
+        qkv = tf.layers.dropout(fields, rate=pd['dropout'], training=g_training)
+        with tf.variable_scope('fi'):
             return multihead_attention(queries = qkv,
                                        keys = qkv,
                                        values = qkv,
@@ -62,7 +60,7 @@ class ItemRecommender(object):
     
     def create_graph(self, scope):
         global g_training, g_dr
-        with tf.compat.v1.variable_scope(scope, reuse=tf.compat.v1.AUTO_REUSE):
+        with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
             feat_dict = get_embeddings(g_dr.unique_feature_num(),
                                        pd['feat_dim'],
                                        scope='feat_embedding', 
@@ -87,24 +85,24 @@ class ItemRecommender(object):
             fi_expert = tf.concat([fi_expert,
                                    tf.reshape(self.user, shape=[n_batch, -1]),
                                    tf.reshape(self.con, shape=[n_batch, -1])], axis = 1)
-            fi_expert = tf.compat.v1.layers.dense(fi_expert, fi_expert.get_shape().as_list()[-1], activation=tf.nn.relu)
-            fi_expert = tf.compat.v1.layers.dense(fi_expert, pd['expert_dim'], activation=tf.nn.relu)
+            fi_expert = tf.layers.dense(fi_expert, fi_expert.get_shape().as_list()[-1], activation=tf.nn.relu)
+            fi_expert = tf.layers.dense(fi_expert, pd['expert_dim'], activation=tf.nn.relu)
             #sys.exit(0)
             edc = tf.reshape(self.doc, shape=[-1, embed_dim])
             esd = tf.reshape(self.seed, shape=[-1, embed_dim])
             #similarity network
             smn0 = tf.multiply(edc, esd)
-            smn1 = tf.compat.v1.reduce_sum(tf.multiply(edc, esd), axis = 1, keep_dims=True)
+            smn1 = tf.reduce_sum(tf.multiply(edc, esd), axis = 1, keep_dims=True)
             smn = tf.reshape(tf.concat([smn0, smn1], axis=1), shape=[n_batch, -1])
             sim_expert = tf.concat([smn, 
                                     tf.reshape(self.user, shape=[n_batch, -1]), 
                                     tf.reshape(self.con, shape=[n_batch, -1])], axis = 1)
-            sim_expert = tf.compat.v1.layers.dense(sim_expert, pd['expert_dim'], activation=tf.nn.relu)
+            sim_expert = tf.layers.dense(sim_expert, pd['expert_dim'], activation=tf.nn.relu)
             #information gain network
             ig_expert = tf.concat([tf.reshape(self.ig, [n_batch, -1]), 
                                    tf.reshape(self.user, [n_batch, -1]), 
                                    tf.reshape(self.con, [n_batch, -1])], axis = 1)
-            ig_expert = tf.compat.v1.layers.dense(ig_expert, pd['expert_dim'], activation=tf.nn.relu)
+            ig_expert = tf.layers.dense(ig_expert, pd['expert_dim'], activation=tf.nn.relu)
             #multi-ciritic
             gate_in = tf.concat([tf.reshape(self.user, [n_batch, -1]),
                                  tf.reshape(self.seed, [n_batch, -1]),
@@ -112,25 +110,25 @@ class ItemRecommender(object):
             experts = tf.stack([fi_expert, sim_expert, ig_expert], axis = 1)
             gates, votes = [], []
             for i in range(pd['critic_num']):
-                gates.append(tf.nn.softmax(tf.compat.v1.layers.dense(gate_in, pd['expert_num'])))
+                gates.append(tf.nn.softmax(tf.layers.dense(gate_in, pd['expert_num'])))
                 gates[i] = tf.reshape(gates[i], [n_batch, pd['expert_num'], 1])
                 votes.append(tf.reduce_sum(gates[i] * experts, axis = 1))
             votes = tf.stack(votes, axis = 1)
             #attention layer
-            w_init=tf.compat.v1.truncated_normal_initializer(stddev=0.01)
+            w_init=tf.truncated_normal_initializer(stddev=0.01)
             att_x = tf.concat([tf.reshape(self.user, [n_batch, -1]),
                                tf.reshape(self.doc, [n_batch, -1]),
                                tf.reshape(self.seed, [n_batch, -1]),
                                tf.reshape(self.con, [n_batch, -1])], axis = 1)
-            att_w = tf.compat.v1.get_variable('att_w', (pd['expert_dim'], att_x.get_shape().as_list()[-1]), initializer = w_init)
+            att_w = tf.get_variable('att_w', (pd['expert_dim'], att_x.get_shape().as_list()[-1]), initializer = w_init)
             att_o = tf.tensordot(votes, att_w, [[2],[0]])
             att_x = tf.tile(tf.expand_dims(att_x, 1), [1, pd['critic_num'], 1])
             att_o = tf.expand_dims(tf.nn.softmax(tf.reduce_sum(att_o * att_x, 2)), -1)
             vote_ret = tf.reduce_sum(att_o * votes, axis = 1)
-            fc = tf.compat.v1.layers.dropout(tf.compat.v1.layers.dense(vote_ret, vote_ret.get_shape().as_list()[-1]/2, activation=tf.nn.relu),
+            fc = tf.layers.dropout(tf.layers.dense(vote_ret, vote_ret.get_shape().as_list()[-1]/2, activation=tf.nn.relu),
                                     rate = pd['dropout'],
                                     training = g_training)
-            self.output = tf.compat.v1.layers.dense(fc, 1, activation=tf.nn.relu)
+            self.output = tf.layers.dense(fc, 1, activation=tf.nn.relu)
 
     #call for evaluation
     def predict(self, sess, ph_dict):
@@ -167,7 +165,7 @@ def handle(sess, net, sess_data):
             for k in range(len(ff)):
                 kk.append(np.array([i, k], dtype=np.int32))
                 vv.append(ff[k])
-        return tf.compat.v1.SparseTensorValue(kk, vv, [len(fs), g_dr.unique_feature_num()])
+        return tf.SparseTensorValue(kk, vv, [len(fs), g_dr.unique_feature_num()])
     if len(sess_data) != pd['batch_size']:
         return
     user, doc, con, seed, dwell = [], [], [], [], []
@@ -206,11 +204,11 @@ def handle(sess, net, sess_data):
                 print('%s %s' % (dwell[i], qout[i]))
 
 def work():
-    sess = tf.compat.v1.Session()
+    sess = tf.Session()
     #build networks
     net = ItemRecommender()
-    saver = tf.compat.v1.train.Saver(max_to_keep=1)
-    g_init_op = tf.compat.v1.global_variables_initializer()
+    saver = tf.train.Saver(max_to_keep=1)
+    g_init_op = tf.global_variables_initializer()
     if os.path.exists('./ckpt') and len(os.listdir('./ckpt')):
         model_file = tf.train.latest_checkpoint('./ckpt')
         saver.restore(sess, model_file)
