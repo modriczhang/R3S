@@ -9,6 +9,7 @@ import sys
 from id_allocator import IdAllocator
 from hyper_param import param_dict as pd
 
+
 class DataReader(object):
     def __init__(self, batch_num):
         self._id_tool = IdAllocator()
@@ -35,11 +36,11 @@ class DataReader(object):
                     ff = ii.split(' ')
                     for fi in ff:
                         pos = fi.find(':')
-                        skv[fi[:pos]] = fi[pos+1:]
+                        skv[fi[:pos]] = fi[pos + 1:]
                 feats = [[], [], [], []]
                 fields = [pd['user_field_num'], pd['doc_field_num'], pd['con_field_num'], pd['doc_field_num']]
                 prefix = ['uf', 'rf', 'cf', 'sf']
-                assert(len(fields) == len(prefix))
+                assert (len(fields) == len(prefix))
                 for k in range(len(fields)):
                     for i in range(fields[k]):
                         fk = '%s%s' % (prefix[k], i)
@@ -57,4 +58,3 @@ class DataReader(object):
             nb = self._data[:idx]
             self._data = self._data[idx:]
         return nb
-

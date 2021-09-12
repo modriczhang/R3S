@@ -9,6 +9,7 @@ modric10zhang@gmail.com
 
 import tensorflow.compat.v1 as tf
 
+
 def layer_norm(inputs, scope='ln'):
     '''Applies layer normalization. See https://arxiv.org/abs/1607.06450.
     inputs: A tensor with 2 or more dimensions, where the first dimension has `batch_size`.
@@ -22,13 +23,14 @@ def layer_norm(inputs, scope='ln'):
     with tf.variable_scope(scope):
         inputs_shape = inputs.get_shape()
         params_shape = inputs_shape[-1:]
-        #[-1] means last dimension 
+        # [-1] means last dimension
         mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
         beta = tf.get_variable("beta", params_shape, initializer=tf.zeros_initializer())
         gamma = tf.get_variable("gamma", params_shape, initializer=tf.ones_initializer())
-        normalized = (inputs - mean) / ( (variance + epsilon) ** (.5) )
+        normalized = (inputs - mean) / ((variance + epsilon) ** (.5))
         outputs = gamma * normalized + beta
     return outputs
+
 
 def get_embeddings(dict_size, num_units, scope, zero_pad=True, partitioner=None):
     '''Constructs token embedding matrix.
@@ -44,15 +46,16 @@ def get_embeddings(dict_size, num_units, scope, zero_pad=True, partitioner=None)
     with tf.variable_scope(scope):
         w_init = tf.truncated_normal_initializer(mean=0, stddev=0.1)
         embeddings = tf.get_variable('w',
-                                   dtype=tf.float32,
-                                   shape=(dict_size, num_units),
-                                   initializer=w_init,
-                                   partitioner=partitioner)
+                                     dtype=tf.float32,
+                                     shape=(dict_size, num_units),
+                                     initializer=w_init,
+                                     partitioner=partitioner)
         #                           initializer=tf.contrib.layers.xavier_initializer())
         if zero_pad:
             embeddings = tf.concat((tf.zeros(shape=[1, num_units]),
                                     embeddings[1:, :]), 0)
     return embeddings
+
 
 def mask(inputs, queries=None, keys=None, type=None):
     """Masks paddings on keys or queries to inputs
@@ -85,7 +88,7 @@ def mask(inputs, queries=None, keys=None, type=None):
     if type in ("k", "key", "keys"):
         # Generate masks
         masks = tf.sign(tf.reduce_sum(tf.abs(keys), axis=-1))  # (N, T_k)
-        masks = tf.expand_dims(masks, 1) # (N, 1, T_k)
+        masks = tf.expand_dims(masks, 1)  # (N, 1, T_k)
         masks = tf.tile(masks, [1, tf.shape(queries)[1], 1])  # (N, T_q, T_k)
 
         # Apply masks to inputs
@@ -98,10 +101,10 @@ def mask(inputs, queries=None, keys=None, type=None):
         masks = tf.tile(masks, [1, 1, tf.shape(keys)[1]])  # (N, T_q, T_k)
 
         # Apply masks to inputs
-        outputs = inputs*masks
+        outputs = inputs * masks
     elif type in ("f", "future", "right"):
         diag_vals = tf.ones_like(inputs[0, :, :])  # (T_q, T_k)
-        #tril = tf.linalg.LinearOperatorLowerTriangular(diag_vals).to_dense()  # (T_q, T_k)
+        # tril = tf.linalg.LinearOperatorLowerTriangular(diag_vals).to_dense()  # (T_q, T_k)
         tril = tf.linalg.band_part(diag_vals, -1, 0)  # (T_q, T_k)
         masks = tf.tile(tf.expand_dims(tril, 0), [tf.shape(inputs)[0], 1, 1])  # (N, T_q, T_k)
 
@@ -111,6 +114,7 @@ def mask(inputs, queries=None, keys=None, type=None):
         print("Check if you entered type correctly!")
 
     return outputs
+
 
 def scaled_dot_product_attention(Q, K, V,
                                  causality=False, dropout_rate=0.,
@@ -148,6 +152,7 @@ def scaled_dot_product_attention(Q, K, V,
         outputs = tf.matmul(outputs, V)  # (N, T_q, d_v)
     return outputs
 
+
 def multihead_attention(queries, keys, values,
                         num_heads=4, dropout_rate=0.,
                         training=True,
@@ -168,22 +173,23 @@ def multihead_attention(queries, keys, values,
     d_model = queries.get_shape().as_list()[-1]
     with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
         # Linear projections
-        Q = tf.layers.dense(queries, d_model, use_bias=False) # (N, T_q, d_model)
-        K = tf.layers.dense(keys, d_model, use_bias=False) # (N, T_k, d_model)
-        V = tf.layers.dense(values, d_model, use_bias=False) # (N, T_k, d_model)
+        Q = tf.layers.dense(queries, d_model, use_bias=False)  # (N, T_q, d_model)
+        K = tf.layers.dense(keys, d_model, use_bias=False)  # (N, T_k, d_model)
+        V = tf.layers.dense(values, d_model, use_bias=False)  # (N, T_k, d_model)
         # Split and concat
-        Q_ = tf.concat(tf.split(Q, num_heads, axis=2), axis=0) # (h*N, T_q, d_model/h)
-        K_ = tf.concat(tf.split(K, num_heads, axis=2), axis=0) # (h*N, T_k, d_model/h)
-        V_ = tf.concat(tf.split(V, num_heads, axis=2), axis=0) # (h*N, T_k, d_model/h)
+        Q_ = tf.concat(tf.split(Q, num_heads, axis=2), axis=0)  # (h*N, T_q, d_model/h)
+        K_ = tf.concat(tf.split(K, num_heads, axis=2), axis=0)  # (h*N, T_k, d_model/h)
+        V_ = tf.concat(tf.split(V, num_heads, axis=2), axis=0)  # (h*N, T_k, d_model/h)
         # Attention
         outputs = scaled_dot_product_attention(Q_, K_, V_, causality, dropout_rate, training)
         # Restore shape
-        outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2 ) # (N, T_q, d_model)
+        outputs = tf.concat(tf.split(outputs, num_heads, axis=0), axis=2)  # (N, T_q, d_model)
         # Residual connection
         outputs += queries
         ## Normalize
-        #outputs = layer_norm(outputs)
+        # outputs = layer_norm(outputs)
     return outputs
+
 
 def feed_forward(inputs, num_units, activation, scope="positionwise_feedforward"):
     '''position-wise feed forward net. See 3.3
