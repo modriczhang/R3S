@@ -1,5 +1,5 @@
 
-## AFE
+## R3S
 
 Users of recommendation systems usually focus on one topic at a time. When finishing reading an item, users may want to access more relevant items related to the last read one as extended reading. 
 
