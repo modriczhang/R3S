@@ -234,7 +234,7 @@ def work():
             batch_cnt += 1
             if g_training and batch_cnt % 10 == 0:
                 print('>>>Average Loss --- epoch %d --- batch %d --- %f' % (
-                k, batch_cnt, g_loss_sum / (g_loss_cnt + 1e-6)))
+                    k, batch_cnt, g_loss_sum / (g_loss_cnt + 1e-6)))
         print('>>>Average Loss --- epoch %d --- batch %d --- %f' % (k, batch_cnt, g_loss_sum / (g_loss_cnt + 1e-6)))
         if g_loss_sum / g_loss_cnt > last_epoch_loss:
             print('Job Finished!')
